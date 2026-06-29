@@ -1,0 +1,3 @@
+Weather getCurrentWeather();
+
+Forecast getForecast();
