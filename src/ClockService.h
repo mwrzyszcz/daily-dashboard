@@ -1,3 +1,0 @@
-String getTime();
-
-String getDate();
