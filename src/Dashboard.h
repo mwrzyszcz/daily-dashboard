@@ -24,6 +24,7 @@ public:
     void addWidget(Widget& widget) noexcept;
     Widget* getWidget(const std::string& id) noexcept;
     const Widget* getWidget(const std::string& id) const noexcept;
+    const std::vector<Widget*>& getWidgets() const noexcept;
 
 private:
     Layout& layout_;

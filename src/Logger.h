@@ -44,7 +44,19 @@ public:
 private:
     static void write(const char* level, const char* tag, const char* message) noexcept
     {
+        char ts[24];
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo, 0)) {
+            std::snprintf(ts, sizeof(ts), "%02d-%02d-%04d %02d:%02d:%02d",
+                          timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900,
+                          timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        } else {
+            const unsigned long ms = millis();
+            std::snprintf(ts, sizeof(ts), "%lu.%03lu", ms / 1000UL, ms % 1000UL);
+        }
         Serial.print('[');
+        Serial.print(ts);
+        Serial.print("] [");
         Serial.print(level);
         Serial.print("] ");
         Serial.print(tag);

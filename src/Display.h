@@ -43,6 +43,5 @@ public:
     void forceFullRefresh() noexcept { needsFullRefresh_ = true; }
 
 private:
-    void renderWidget(const Dashboard& dashboard, const std::string& widgetId) const noexcept;
     bool needsFullRefresh_ = true;
 };

@@ -4,6 +4,7 @@
 #include <utility>
 
 #include <Arduino.h>
+#include <WiFi.h>
 #include "Logger.h"
 #include "models/DashboardState.h"
 #include "services/ApplicationDiagnostics.h"
@@ -47,6 +48,7 @@ void Application::setup() noexcept
     Logger::info("Application", "Initializing services");
 
     display_.init();
+    connectWiFi();
     clockService_.begin();
 
     refreshDashboardState();
@@ -63,6 +65,28 @@ void Application::loop() noexcept
 {
     handleDeveloperCommands();
     vTaskDelay(pdMS_TO_TICKS(1000));
+}
+
+void Application::connectWiFi() noexcept
+{
+    const char* ssid     = configuration_.getWifiSSID().c_str();
+    const char* password = configuration_.getWifiPassword().c_str();
+
+    Logger::info("WiFi", "Connecting...");
+    WiFi.begin(ssid, password);
+
+    constexpr int MAX_ATTEMPTS = 20;
+    for (int attempt = 0; attempt < MAX_ATTEMPTS; ++attempt) {
+        if (WiFi.status() == WL_CONNECTED) {
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), "Connected, IP: %s", WiFi.localIP().toString().c_str());
+            Logger::info("WiFi", buf);
+            return;
+        }
+        delay(500);
+    }
+
+    Logger::warn("WiFi", "Connection failed — services requiring network will not work");
 }
 
 void Application::handleDeveloperCommands() noexcept
@@ -118,15 +142,14 @@ void Application::runDiagnostics() noexcept
 
 void Application::initializeScheduler() noexcept
 {
-    scheduler_.every(1000UL, [this]() {
+    scheduler_.everyMinutes(configuration_.getClockRefreshMinutes(), [this]() {
         updateClock();
     });
-    scheduler_.everyMinutes(30, [this]() {
+    scheduler_.everyMinutes(configuration_.getWeatherRefreshMinutes(), [this]() {
         refreshWeather();
     });
-    scheduler_.everyHours(24, [this]() {
-        refreshNameday();
-    });
+    // Imieniny, kalendarz i święta odświeżane są chwilę po północy przy zmianie daty (patrz updateClock()),
+    // dlatego nie ma tu osobnego zadania czasowego.
 }
 
 void Application::refreshDashboardState() noexcept
@@ -139,6 +162,8 @@ void Application::refreshDashboardState() noexcept
     state.time = currentTime;
     state.weather = weatherService_.getCurrentWeather();
     state.forecast = weatherService_.getForecast();
+    state.weatherUpdatedDate = currentDate;
+    state.weatherUpdatedTime = currentTime;
 
     if (isValidDate(currentDate)) {
         state.calendarMonth = calendarService_.getCurrentMonth(currentDate);
@@ -162,15 +187,19 @@ void Application::updateClock() noexcept
 
     state.date = currentDate;
     state.time = currentTime;
-
-    if (isValidDate(currentDate) && !isSameDate(previousDate, currentDate)) {
-        state.calendarMonth = calendarService_.getCurrentMonth(currentDate);
-        state.holiday = holidayService_.getHolidayInfo(currentDate);
-        state.namedays = namedayService_.getNamedays(currentDate);
-    }
-
     dashboard_.setState(std::move(state));
-    display_.partialUpdate(dashboard_);
+
+    const bool dateChanged = isValidDate(currentDate) && !isSameDate(previousDate, currentDate);
+
+    if (currentTime.minutes != lastDisplayedMinute_) {
+        lastDisplayedMinute_ = currentTime.minutes;
+        if (Widget* w = dashboard_.getWidget("clock_widget")) w->invalidate();
+        if (dateChanged) {
+            // Zmiana daty = chwilę po północy: odśwież imieniny, kalendarz i święta.
+            refreshNameday();
+        }
+        display_.partialUpdate(dashboard_);
+    }
 }
 
 void Application::refreshWeather() noexcept
@@ -178,11 +207,18 @@ void Application::refreshWeather() noexcept
     DashboardState state = dashboard_.getState();
     state.weather = weatherService_.getCurrentWeather();
     state.forecast = weatherService_.getForecast();
+    state.weatherUpdatedDate = clockService_.getDate();
+    state.weatherUpdatedTime = clockService_.getTime();
 
     dashboard_.setState(std::move(state));
+    if (Widget* w = dashboard_.getWidget("weather_widget"))  w->invalidate();
+    if (Widget* w = dashboard_.getWidget("forecast_widget")) w->invalidate();
+    if (Widget* w = dashboard_.getWidget("status_bar_widget")) w->invalidate();
     display_.partialUpdate(dashboard_);
 }
 
+// Odświeża imieniny, kalendarz i święta dla bieżącej daty. Wołane chwilę po północy z updateClock().
+// Nie wykonuje samo partialUpdate() — robi to wywołujący po zebraniu wszystkich brudnych widgetów.
 void Application::refreshNameday() noexcept
 {
     DashboardState state = dashboard_.getState();
@@ -199,5 +235,7 @@ void Application::refreshNameday() noexcept
     state.namedays = namedayService_.getNamedays(currentDate);
 
     dashboard_.setState(std::move(state));
-    display_.partialUpdate(dashboard_);
+    if (Widget* w = dashboard_.getWidget("nameday_widget"))  w->invalidate();
+    if (Widget* w = dashboard_.getWidget("holiday_widget"))  w->invalidate();
+    if (Widget* w = dashboard_.getWidget("calendar_widget")) w->invalidate();
 }

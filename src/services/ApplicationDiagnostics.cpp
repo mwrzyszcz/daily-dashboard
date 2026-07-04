@@ -1,12 +1,60 @@
 #include "services/ApplicationDiagnostics.h"
 
+#include <cstdio>
 #include "Logger.h"
+#include "models/Date.h"
+#include "models/Holiday.h"
 
 namespace
 {
 bool hasWeatherPayload(const Weather& weather) noexcept
 {
     return weather.temperature != 0.0f || weather.humidity != 0 || weather.pressure != 0 || !weather.description.empty();
+}
+
+void logWeatherDetail(const Weather& weather) noexcept
+{
+    char buf[128];
+    std::snprintf(buf, sizeof(buf),
+                  "temp=%.1f degC  feels=%.1f  hum=%u%%  pres=%uhPa  desc='%s'",
+                  weather.temperature, weather.feelsLike,
+                  weather.humidity, weather.pressure,
+                  weather.description.c_str());
+    Logger::info("Diagnostics", buf);
+}
+
+void logDateDetail(const Date& date) noexcept
+{
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "date=%04u-%02u-%02u  weekday=%u  week=%u",
+                  date.year, date.month, date.day,
+                  date.weekday, date.weekNumber);
+    Logger::info("Diagnostics", buf);
+}
+
+void logHolidayDetail(const Holiday& holiday) noexcept
+{
+    char buf[128];
+    std::snprintf(buf, sizeof(buf), "isHoliday=%s  isPublic=%s  name='%s'",
+                  holiday.isHoliday ? "yes" : "no",
+                  holiday.isPublicHoliday ? "yes" : "no",
+                  holiday.name.c_str());
+    Logger::info("Diagnostics", buf);
+}
+
+void logNamedaysDetail(const std::vector<std::string>& namedays) noexcept
+{
+    if (namedays.empty()) {
+        Logger::info("Diagnostics", "namedays=[]");
+        return;
+    }
+    std::string list = "namedays=[ ";
+    for (size_t i = 0; i < namedays.size(); ++i) {
+        if (i > 0) list += ", ";
+        list += '\'' + namedays[i] + '\'';
+    }
+    list += " ]";
+    Logger::info("Diagnostics", list.c_str());
 }
 }
 
@@ -29,6 +77,7 @@ void ApplicationDiagnostics::run() const noexcept
     const auto& state = dashboard_.getState();
     const bool timeSynchronized = clockService_.isTimeValid();
     logResult("Clock synchronization", timeSynchronized, timeSynchronized ? "NTP time valid" : "NTP sync not confirmed");
+    logDateDetail(state.date);
     timeSynchronized ? ++passedChecks : ++failedChecks;
 
     const bool schedulerRegistered = scheduler_.taskCount() >= 3;
@@ -45,10 +94,15 @@ void ApplicationDiagnostics::run() const noexcept
 
     const bool weatherReady = hasWeatherPayload(state.weather);
     logResult("Weather integration", weatherReady, weatherReady ? "Weather payload available" : "Weather data empty or defaulted");
+    logWeatherDetail(state.weather);
     weatherReady ? ++passedChecks : ++failedChecks;
 
     const bool forecastReady = !state.forecast.empty();
-    logResult("Forecast integration", forecastReady, forecastReady ? "Forecast entries loaded" : "Forecast data empty");
+    {
+        char buf[48];
+        std::snprintf(buf, sizeof(buf), "forecast entries=%zu", state.forecast.size());
+        logResult("Forecast integration", forecastReady, forecastReady ? buf : "Forecast data empty");
+    }
     forecastReady ? ++passedChecks : ++failedChecks;
 
     const bool calendarReady = dateReady && state.calendarMonth.year == state.date.year && state.calendarMonth.month == state.date.month && !state.calendarMonth.weeks.empty();
@@ -56,11 +110,17 @@ void ApplicationDiagnostics::run() const noexcept
     calendarReady ? ++passedChecks : ++failedChecks;
 
     const bool namedayReady = !state.namedays.empty();
-    logResult("Nameday integration", namedayReady, namedayReady ? "Nameday entries available" : "Nameday list empty");
+    {
+        char buf[48];
+        std::snprintf(buf, sizeof(buf), "nameday entries=%zu", state.namedays.size());
+        logResult("Nameday integration", namedayReady, namedayReady ? buf : "Nameday list empty");
+    }
+    logNamedaysDetail(state.namedays);
     namedayReady ? ++passedChecks : ++failedChecks;
 
     const bool holidayConsistent = state.holiday.isHoliday == !state.holiday.name.empty();
     logResult("Holiday integration", holidayConsistent, holidayConsistent ? "Holiday state consistent" : "Holiday flag and name diverged");
+    logHolidayDetail(state.holiday);
     holidayConsistent ? ++passedChecks : ++failedChecks;
 
     char summary[96];

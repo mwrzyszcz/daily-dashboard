@@ -72,6 +72,7 @@ CalendarMonth CalendarService::getCurrentMonth(const Date& date) const noexcept
                 cd.inMonth = true;
                 cd.day = day;
                 cd.isWeekend = (i >= 5);
+                cd.isToday = (day == date.day);
                 ++day;
             }
             week.days[i] = cd;

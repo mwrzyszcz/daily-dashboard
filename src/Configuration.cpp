@@ -3,9 +3,11 @@
 void Configuration::load() noexcept
 {
     refreshIntervalMs_ = 10000UL;
-    wifiSSID_ = "mw-iot";
-    wifiPassword_ = "100200300";
-    openWeatherApiKey_ = "34656f074300206bdf7f57c3f263803a";
+    clockRefreshMinutes_ = 1;      // zegar co 1 minutę
+    weatherRefreshMinutes_ = 60;   // pogoda i prognoza co 1 godzinę
+    wifiSSID_ = "mw-changeme";
+    wifiPassword_ = "changeme";
+    openWeatherApiKey_ = "changeme";
     latitude_ = 51.2465f;
     longitude_ = 22.5684f;
     language_ = "pl";
@@ -16,6 +18,16 @@ void Configuration::load() noexcept
 unsigned long Configuration::getRefreshIntervalMs() const noexcept
 {
     return refreshIntervalMs_;
+}
+
+uint16_t Configuration::getClockRefreshMinutes() const noexcept
+{
+    return clockRefreshMinutes_;
+}
+
+uint16_t Configuration::getWeatherRefreshMinutes() const noexcept
+{
+    return weatherRefreshMinutes_;
 }
 
 const std::string& Configuration::getWifiSSID() const noexcept

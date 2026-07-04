@@ -15,10 +15,11 @@
 /**
  * @brief Główna klasa aplikacji.
  * 
- * Uses FreeRTOS scheduler for battery-efficient periodic updates:
- * - Clock: every 1 second
- * - Weather: every 30 minutes
- * - Nameday: every 24 hours
+ * Uses FreeRTOS scheduler for battery-efficient periodic updates.
+ * Refresh intervals per widget are configurable (see Configuration):
+ * - Clock: every getClockRefreshMinutes() minutes (default 1) — only the clock region is redrawn
+ * - Weather + forecast: every getWeatherRefreshMinutes() minutes (default 60)
+ * - Nameday/calendar: shortly after midnight (triggered on date change in updateClock())
  */
 class Application
 {
@@ -39,6 +40,7 @@ public:
 private:
     void handleDeveloperCommands() noexcept;
     void runDiagnostics() noexcept;
+    void connectWiFi() noexcept;
     void initializeScheduler() noexcept;
     void refreshDashboardState() noexcept;
     void updateClock() noexcept;
@@ -55,4 +57,5 @@ private:
     NamedayService& namedayService_;
     
     Scheduler scheduler_;
+    uint8_t lastDisplayedMinute_ = 255;  // 255 = not yet rendered
 };

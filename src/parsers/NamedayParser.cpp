@@ -11,6 +11,28 @@ static inline std::string trim(const std::string& s)
     return s.substr(a, b - a);
 }
 
+static void appendCommaSeparated(std::vector<std::string>& result, const char* names)
+{
+    if (names == nullptr) {
+        return;
+    }
+
+    std::string text(names);
+    size_t start = 0;
+    while (start < text.size()) {
+        size_t pos = text.find(',', start);
+        std::string token = (pos == std::string::npos) ? text.substr(start) : text.substr(start, pos - start);
+        token = trim(token);
+        if (!token.empty() && token != "n/a") {
+            result.push_back(token);
+        }
+        if (pos == std::string::npos) {
+            break;
+        }
+        start = pos + 1;
+    }
+}
+
 std::vector<std::string> NamedayParser::parseToday(const std::string& json) const
 {
     std::vector<std::string> result;
@@ -30,24 +52,31 @@ std::vector<std::string> NamedayParser::parseToday(const std::string& json) cons
         return result;
     }
 
+    // Current API format returns language entries directly under data, e.g. data.pl.
+    if (data["pl"].is<const char*>()) {
+        appendCommaSeparated(result, data["pl"].as<const char*>());
+        if (!result.empty()) {
+            return result;
+        }
+    }
+
+    // Backward compatibility for the older data.namedays.pl shape.
     JsonObject namedays = data["namedays"].as<JsonObject>();
     if (namedays.isNull()) {
         return result;
     }
 
-    // The API returns language keys mapped to comma separated names, e.g. { "pl": "Piotr, Paweł" }
+    if (namedays["pl"].is<const char*>()) {
+        appendCommaSeparated(result, namedays["pl"].as<const char*>());
+        return result;
+    }
+
+    // Last-resort fallback if the API doesn't expose a dedicated Polish entry.
     for (JsonPair kv : namedays) {
         if (!kv.value().is<const char*>()) continue;
-        const char* names = kv.value().as<const char*>();
-        std::string s(names);
-        size_t start = 0;
-        while (start < s.size()) {
-            size_t pos = s.find(',', start);
-            std::string token = (pos == std::string::npos) ? s.substr(start) : s.substr(start, pos - start);
-            token = trim(token);
-            if (!token.empty()) result.push_back(token);
-            if (pos == std::string::npos) break;
-            start = pos + 1;
+        appendCommaSeparated(result, kv.value().as<const char*>());
+        if (!result.empty()) {
+            break;
         }
     }
 

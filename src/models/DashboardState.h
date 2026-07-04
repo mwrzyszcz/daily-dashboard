@@ -19,6 +19,10 @@ struct DashboardState
     Weather weather;
     std::vector<Forecast> forecast;
 
+    // Znacznik czasu ostatniej aktualizacji pogody/prognozy (sekcja "Aktualizacja").
+    Date weatherUpdatedDate;
+    Time weatherUpdatedTime;
+
     CalendarMonth calendarMonth;
     std::vector<std::string> namedays;
     Holiday holiday;  // Now includes isPublicHoliday flag
