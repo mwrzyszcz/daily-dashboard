@@ -78,11 +78,11 @@ U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;
 // =====================================================================================
 constexpr float kTextScaleTiny  = 0.36f; // etykiety kalendarza, drobne opisy (~12 px)
 constexpr float kTextScaleSmall = 0.44f; // etykiety, opisy (~15 px)
-constexpr float kTextScaleBody  = 0.52f; // nagłówki sekcji (~18 px)
-constexpr float kTextScaleValue = 0.60f; // wyróżnione wartości (~20 px)
+constexpr float kTextScaleBody  = 0.40f; // nagłówki sekcji (~18 px)
+constexpr float kTextScaleValue = 0.50f; // wyróżnione wartości (~20 px)
 constexpr float kTextScaleName  = 0.66f; // imieniny (~22 px)
-constexpr float kTextScaleTemp  = 0.74f; // temperatura bieżąca (~25 px)
-constexpr float kTextScaleRow   = 0.84f; // dolny wiersz zegara (~15 px)
+constexpr float kTextScaleTemp  = 0.18f; // temperatura bieżąca (~25 px)
+constexpr float kTextScaleRow   = 0.64f; // dolny wiersz zegara (~15 px)
 
 // =====================================================================================
 //  Warstwa dekodowania UTF-8 i rastrowego renderowania fontu z polskimi znakami.
@@ -139,6 +139,13 @@ int16_t glyphHeightAt(const float textScale) noexcept
 {
     u8g2Fonts.setFont(fontForScale(textScale));
     return static_cast<int16_t>(u8g2Fonts.getFontAscent() - u8g2Fonts.getFontDescent());
+}
+
+// Ascent (odległość od linii bazowej do góry glifu) — do wyrównywania tekstów o różnych rozmiarach.
+int16_t glyphAscentAt(const float textScale) noexcept
+{
+    u8g2Fonts.setFont(fontForScale(textScale));
+    return static_cast<int16_t>(u8g2Fonts.getFontAscent());
 }
 
 // Zwraca szerokość napisu w pikselach dla zadanej skali tekstu (proporcjonalny font U8g2).
@@ -282,7 +289,7 @@ int16_t drawWrappedTextCentered(const int16_t regionX,
 }
 
 // Wielki font zegara — czytelny, natywny rozmiar U8g2 (cyfry i dwukropek), ostre krawędzie.
-const uint8_t* const kClockFont = u8g2_font_logisoso58_tn;
+const uint8_t* const kClockFont = u8g2_font_logisoso78_tn;
 
 // Rysuje wielki zegar natywnym fontem U8g2 (bez skalowania, ostre krawędzie).
 void drawClockDigits(const int16_t originX, const int16_t topY, const std::string& text) noexcept
@@ -298,6 +305,34 @@ int16_t clockDigitsWidth(const std::string& text) noexcept
 {
     u8g2Fonts.setFont(kClockFont);
     return u8g2Fonts.getUTF8Width(text.c_str());
+}
+
+// Dedykowany, powiększony font wskaźnika aktualnej temperatury (cyfry, znak stopnia i litery).
+const uint8_t* const kTemperatureFont = u8g2_font_fub30_tf;  // prognoza (kafelki dni)
+const uint8_t* const kCurrentTempFont = u8g2_font_fub35_tf;  // aktualna pogoda (jeszcze większa)
+
+// Rysuje wyróżnioną, dużą temperaturę bieżącą natywnym fontem U8g2 (ostro, UTF-8).
+void drawTemperatureText(const int16_t originX, const int16_t topY, const std::string& text,
+                         const uint8_t* font = kTemperatureFont) noexcept
+{
+    u8g2Fonts.setFont(font);
+    u8g2Fonts.setFontMode(1); // setFont() resetuje tryb na solid — wymuś przezroczystość
+    u8g2Fonts.setForegroundColor(GxEPD_BLACK);
+    u8g2Fonts.drawUTF8(originX, static_cast<int16_t>(topY + u8g2Fonts.getFontAscent()), text.c_str());
+}
+
+// Szerokość napisu temperatury w pikselach.
+int16_t temperatureTextWidth(const std::string& text, const uint8_t* font = kTemperatureFont) noexcept
+{
+    u8g2Fonts.setFont(font);
+    return u8g2Fonts.getUTF8Width(text.c_str());
+}
+
+// Ascent dużego fontu temperatury — do wyrównania z mniejszym tekstem do wspólnej linii bazowej.
+int16_t temperatureAscent(const uint8_t* font = kTemperatureFont) noexcept
+{
+    u8g2Fonts.setFont(font);
+    return static_cast<int16_t>(u8g2Fonts.getFontAscent());
 }
 
 // =====================================================================================
@@ -598,7 +633,7 @@ void drawClockSection(const int16_t x,
     char timeText[8];
     std::snprintf(timeText, sizeof(timeText), "%02u:%02u", time.hours, time.minutes);
     const int16_t clockStartX = x + std::max<int16_t>(0, (width - clockDigitsWidth(timeText)) / 2);
-    drawClockDigits(clockStartX, y + 26, timeText);
+    drawClockDigits(clockStartX, y + 20, timeText);
 
     const int16_t rowTop = y + height - 44;
     const int16_t iconSize = 22;
@@ -677,9 +712,12 @@ void drawCalendarSection(const int16_t x,
             const int16_t cellX = gridX + column * cellWidth;
             const std::string label = std::to_string(day.day);
             if (day.isToday) {
-                display.drawRoundRect(cellX + 2, rowTop - 3, cellWidth - 4, 19, 3, GxEPD_BLACK);
-                display.drawRoundRect(cellX + 3, rowTop - 2, cellWidth - 6, 17, 3, GxEPD_BLACK);
-                drawTextCentered(cellX, cellWidth, rowTop, label, kTextScaleTiny);
+                const int16_t frameTop = rowTop - 3;
+                const int16_t frameHeight = 19;
+                display.drawRoundRect(cellX + 2, frameTop, cellWidth - 4, frameHeight, 3, GxEPD_BLACK);
+                display.drawRoundRect(cellX + 3, frameTop + 1, cellWidth - 6, frameHeight - 2, 3, GxEPD_BLACK);
+                const int16_t todayTop = frameTop + (frameHeight - glyphAscentAt(kTextScaleValue)) / 2;
+                drawTextCentered(cellX, cellWidth, todayTop, label, kTextScaleValue);
             } else {
                 drawTextCentered(cellX, cellWidth, rowTop, label, kTextScaleTiny);
             }
@@ -711,31 +749,37 @@ void drawCurrentWeatherSection(const int16_t x,
                                const Weather& weather) noexcept
 {
     drawSectionFrame(x, y, width, height);
-    drawText(x + 16, y + 16, "TERAZ", kTextScaleBody);
 
-    const int16_t leftWidth = 196;
+    const int16_t leftWidth = 224;
     const int16_t dividerX = x + leftWidth;
-    display.drawFastVLine(dividerX, y + 40, height - 52, GxEPD_BLACK);
+    display.drawFastVLine(dividerX, y + 16, height - 30, GxEPD_BLACK);
 
-    const int16_t iconSize = 80;
-    drawWeatherIcon(x + 12, y + 48, iconSize, weather.icon);
+    const int16_t iconSize = 84;
+    drawWeatherIcon(x + 12, y + 22, iconSize, weather.icon);
 
-    const int16_t tempX = x + 12 + iconSize + 6;
+    const int16_t tempX = x + 12 + iconSize + 8;
     const int16_t tempMaxWidth = dividerX - tempX - 6;
-    drawText(tempX, y + 66, fitText(formatTemperature(weather.temperature), tempMaxWidth, kTextScaleTemp), kTextScaleTemp);
+    const std::string tempText = formatTemperature(weather.temperature);
+    if (temperatureTextWidth(tempText, kCurrentTempFont) <= tempMaxWidth) {
+        drawTemperatureText(tempX, y + 46, tempText, kCurrentTempFont);
+    } else if (temperatureTextWidth(tempText, kTemperatureFont) <= tempMaxWidth) {
+        drawTemperatureText(tempX, y + 52, tempText, kTemperatureFont);
+    } else {
+        drawText(tempX, y + 60, fitText(tempText, tempMaxWidth, kTextScaleTemp), kTextScaleTemp);
+    }
 
     if (!weather.description.empty()) {
-        drawWrappedTextCentered(x + 12, leftWidth - 20, y + 146, weather.description, kTextScaleSmall, 17, 2);
+        drawWrappedTextCentered(x + 12, leftWidth - 20, y + 128, weather.description, kTextScaleValue, 20, 2);
     }
 
     const int16_t metricX = dividerX + 14;
     const int16_t metricWidth = x + width - metricX - 10;
-    drawWeatherMetric(metricX, y + 50, metricWidth, "Odczuwalna", formatTemperature(weather.feelsLike), drawThermometerIcon);
-    drawWeatherMetric(metricX, y + 96, metricWidth, "Wilgotność", std::to_string(weather.humidity) + "%", drawHumidityIcon);
-    drawWeatherMetric(metricX, y + 142, metricWidth, "Ciśnienie", std::to_string(weather.pressure) + " hPa", drawPressureIcon);
+    drawWeatherMetric(metricX, y + 26, metricWidth, "Odczuwalna", formatTemperature(weather.feelsLike), drawThermometerIcon);
+    drawWeatherMetric(metricX, y + 90, metricWidth, "Wilgotność", std::to_string(weather.humidity) + "%", drawHumidityIcon);
+    drawWeatherMetric(metricX, y + 154, metricWidth, "Ciśnienie", std::to_string(weather.pressure) + " hPa", drawPressureIcon);
 }
 
-// Środkowy-prawy panel: prognoza na pięć dni w kolumnach (dzień, data, ikona, zakres temperatur).
+// Środkowy-prawy panel: prognoza na trzy dni w kolumnach (dzień, data, ikona, zakres temperatur).
 void drawForecastSection(const int16_t x,
                          const int16_t y,
                          const int16_t width,
@@ -743,14 +787,13 @@ void drawForecastSection(const int16_t x,
                          const std::vector<Forecast>& forecast) noexcept
 {
     drawSectionFrame(x, y, width, height);
-    drawText(x + 16, y + 16, "PROGNOZA", kTextScaleBody);
 
-    constexpr int16_t columns = 5;
+    constexpr int16_t columns = 3;
     const int16_t columnWidth = static_cast<int16_t>((width - 24) / columns);
     const int16_t gridX = x + 12;
 
     for (int16_t column = 1; column < columns; ++column) {
-        display.drawFastVLine(gridX + column * columnWidth, y + 42, height - 54, GxEPD_BLACK);
+        display.drawFastVLine(gridX + column * columnWidth, y + 16, height - 30, GxEPD_BLACK);
     }
 
     const size_t count = std::min<size_t>(columns, forecast.size());
@@ -762,16 +805,27 @@ void drawForecastSection(const int16_t x,
     for (size_t index = 0; index < count; ++index) {
         const Forecast& day = forecast[index];
         const int16_t columnX = gridX + static_cast<int16_t>(index) * columnWidth;
-        drawTextCentered(columnX + 2, columnWidth - 4, y + 46, forecastWeekdayLabel(day.date.weekday), kTextScaleSmall);
+        drawTextCentered(columnX + 2, columnWidth - 4, y + 20, forecastWeekdayLabel(day.date.weekday), kTextScaleValue);
         const std::string dateLabel = std::to_string(day.date.day) + "." + std::to_string(day.date.month);
-        drawTextCentered(columnX + 2, columnWidth - 4, y + 66, dateLabel, kTextScaleTiny);
+        drawTextCentered(columnX + 2, columnWidth - 4, y + 44, dateLabel, kTextScaleBody);
 
-        const int16_t iconSize = 48;
-        drawWeatherIcon(columnX + (columnWidth - iconSize) / 2, y + 86, iconSize, day.icon);
+        const int16_t iconSize = 88;
+        drawWeatherIcon(columnX + (columnWidth - iconSize) / 2, y + 50, iconSize, day.icon);
 
-        const std::string rangeText = std::to_string(static_cast<int>(std::lround(day.maxTemp))) + "\u00B0/" +
-                                      std::to_string(static_cast<int>(std::lround(day.minTemp))) + "\u00B0";
-        drawTextCentered(columnX + 2, columnWidth - 4, y + height - 30, fitText(rangeText, columnWidth - 6, kTextScaleSmall), kTextScaleSmall);
+        // Wyróżniona temperatura: maksymalna dużym, dedykowanym fontem; minimalna mniejsza i pogrubiona —
+        // obie wyrównane do wspólnej linii bazowej i wyśrodkowane w kolumnie.
+        const std::string maxStr = std::to_string(static_cast<int>(std::lround(day.maxTemp))) + "\u00B0";
+        const std::string minStr = "/" + std::to_string(static_cast<int>(std::lround(day.minTemp))) + "\u00B0";
+        const float minScale = kTextScaleValue;
+        const int16_t maxTextWidth = temperatureTextWidth(maxStr);
+        const int16_t minTextWidth = textWidth(minStr, minScale);
+        const int16_t totalWidth = static_cast<int16_t>(maxTextWidth + minTextWidth);
+        const int16_t rangeStartX = columnX + 2 + std::max<int16_t>(0, (columnWidth - 4 - totalWidth) / 2);
+        const int16_t rangeTop = y + height - 44;
+        const int16_t baseline = static_cast<int16_t>(rangeTop + temperatureAscent());
+        drawTemperatureText(rangeStartX, rangeTop, maxStr);
+        drawText(static_cast<int16_t>(rangeStartX + maxTextWidth),
+                 static_cast<int16_t>(baseline - glyphAscentAt(minScale)), minStr, minScale);
     }
 }
 
@@ -816,11 +870,15 @@ void drawStatusBar(const int16_t x,
 
     const std::string ntpValue = (state.date.year >= 2000) ? "OK" : "BŁĄD";
 
+    // Wschód/zachód słońca pochodzą z danych prognozy (obiekt "city" odpowiedzi OpenWeather).
+    const uint32_t sunrise = state.forecast.empty() ? 0U : state.forecast.front().sunrise;
+    const uint32_t sunset  = state.forecast.empty() ? 0U : state.forecast.front().sunset;
+
     drawStatusItem(x, y, columnWidth, "WiFi", wifiValue, drawWifiIcon);
     drawStatusItem(x + columnWidth, y, columnWidth, "Aktualizacja", updateValue, drawGlobeIcon);
     drawStatusItem(x + columnWidth * 2, y, columnWidth, "NTP", ntpValue, drawNtpIcon);
-    drawStatusItem(x + columnWidth * 3, y, columnWidth, "Wschód", formatSunTime(state.weather.sunrise), drawSunriseIcon);
-    drawStatusItem(x + columnWidth * 4, y, columnWidth, "Zachód", formatSunTime(state.weather.sunset), drawSunsetIcon);
+    drawStatusItem(x + columnWidth * 3, y, columnWidth, "Wschód", formatSunTime(sunrise), drawSunriseIcon);
+    drawStatusItem(x + columnWidth * 4, y, columnWidth, "Zachód", formatSunTime(sunset), drawSunsetIcon);
 }
 
 // Prostokąt jednej sekcji dashboardu (współrzędne ekranu).
@@ -854,9 +912,11 @@ DashboardLayout computeLayout() noexcept
     const int16_t topY = margin;
     const int16_t topHeight = 196;
     const int16_t middleY = topY + topHeight + gap;
-    const int16_t middleHeight = 186;
     const int16_t statusHeight = 54;
     const int16_t statusY = screenHeight - statusHeight - margin;
+    // Sekcja środkowa (pogoda + prognoza) rozciąga się aż do paska statusu, zostawiając tylko
+    // standardowy odstęp (gap) — dzięki temu ramki są większe, a przerwa nad statusami minimalna.
+    const int16_t middleHeight = static_cast<int16_t>(statusY - gap - middleY);
 
     const int16_t clockX = margin;
     const int16_t clockWidth = 356;

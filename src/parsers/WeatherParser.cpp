@@ -129,6 +129,8 @@ JsonDocument buildForecastFilter()
     filter["list"][0]["main"]["temp_min"] = true;
     filter["list"][0]["main"]["temp_max"] = true;
     filter["list"][0]["weather"][0]["icon"] = true;
+    filter["city"]["sunrise"] = true;
+    filter["city"]["sunset"] = true;
     return filter;
 }
 }
@@ -188,6 +190,9 @@ std::vector<Forecast> WeatherParser::parseForecast(const std::string& json) cons
         Logger::warn("WeatherParser", "Forecast payload has no list array");
         return forecast;
     }
+
+    const uint32_t citySunrise = doc["city"]["sunrise"] | 0U;
+    const uint32_t citySunset = doc["city"]["sunset"] | 0U;
 
     std::vector<ForecastAggregate> aggregates;
     aggregates.reserve(5);
@@ -252,7 +257,10 @@ std::vector<Forecast> WeatherParser::parseForecast(const std::string& json) cons
         if (!aggregate.initialized) {
             continue;
         }
-        forecast.push_back(Forecast{aggregate.date, aggregate.minTemp, aggregate.maxTemp, aggregate.icon});
+        Forecast entry{aggregate.date, aggregate.minTemp, aggregate.maxTemp, aggregate.icon};
+        entry.sunrise = citySunrise;
+        entry.sunset = citySunset;
+        forecast.push_back(entry);
     }
 
     char summary[48];

@@ -24,4 +24,6 @@ public:
     float minTemp = 0.0f;
     float maxTemp = 0.0f;
     WeatherIcon icon = WeatherIcon::Unknown;
+    uint32_t sunrise = 0;
+    uint32_t sunset = 0;
 };
