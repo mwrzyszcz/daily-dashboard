@@ -9,6 +9,7 @@
 #include "widgets/WeatherWidget.h"
 #include "widgets/ForecastWidget.h"
 #include "widgets/CalendarWidget.h"
+#include "widgets/CurrencyWidget.h"
 #include "widgets/NamedayWidget.h"
 #include "widgets/HolidayWidget.h"
 #include "widgets/StatusBarWidget.h"
@@ -17,12 +18,16 @@
 #include "services/CalendarService.h"
 #include "services/HolidayService.h"
 #include "services/NamedayService.h"
+#include "services/CurrencyService.h"
 #include "repositories/WeatherRepository.h"
 #include "clients/WeatherClient.h"
 #include "parsers/WeatherParser.h"
 #include "clients/NamedayClient.h"
 #include "parsers/NamedayParser.h"
 #include "repositories/NamedayRepository.h"
+#include "clients/CurrencyClient.h"
+#include "parsers/CurrencyParser.h"
+#include "repositories/CurrencyRepository.h"
 
 static Application& application()
 {
@@ -42,10 +47,17 @@ static Application& application()
     static NamedayRepository namedayRepository(clockService);
     static NamedayService namedayService(namedayRepository);
 
+    // Currency REST pipeline (frankfurter.dev) — kursy EUR/USD/CHF względem PLN
+    static CurrencyClient currencyClient;
+    static CurrencyParser currencyParser;
+    static CurrencyRepository currencyRepository(clockService, currencyClient, currencyParser);
+    static CurrencyService currencyService(currencyRepository);
+
     static ClockWidget clockWidget("clock_widget");
     static WeatherWidget weatherWidget("weather_widget");
     static ForecastWidget forecastWidget("forecast_widget");
     static CalendarWidget calendarWidget("calendar_widget");
+    static CurrencyWidget currencyWidget("currency_widget");
     static NamedayWidget namedayWidget("nameday_widget");
     static HolidayWidget holidayWidget("holiday_widget");
     static StatusBarWidget statusBarWidget("status_bar_widget");
@@ -56,7 +68,10 @@ static Application& application()
     dashboard.addWidget(clockWidget);
     dashboard.addWidget(weatherWidget);
     dashboard.addWidget(forecastWidget);
-    dashboard.addWidget(calendarWidget);
+    // Widget Kalendarz zastąpiony widgetem Waluty. Aby przywrócić kalendarz,
+    // odkomentuj poniższą linię i zakomentuj addWidget(currencyWidget).
+    // dashboard.addWidget(calendarWidget);
+    dashboard.addWidget(currencyWidget);
     dashboard.addWidget(namedayWidget);
     dashboard.addWidget(holidayWidget);
     dashboard.addWidget(statusBarWidget);
@@ -69,7 +84,8 @@ static Application& application()
                            weatherService,
                            calendarService,
                            holidayService,
-                           namedayService);
+                           namedayService,
+                           currencyService);
     return app;
 }
 

@@ -1,6 +1,7 @@
 #include "Display.h"
 #include "Dashboard.h"
 #include "Logger.h"
+#include "generated/MdiIcons.h"
 #include <Arduino.h>
 #include <SPI.h>
 #include <WiFi.h>
@@ -405,7 +406,8 @@ std::string formatSunTime(const uint32_t unixTimestamp) noexcept
 }
 
 // =====================================================================================
-//  Ikony rysowane z prymitywów geometrycznych (styl e-paper, grube linie).
+//  Ikony Material Design Icons (MDI) renderowane z bitmap 1-bit — patrz src/generated/MdiIcons.h.
+//  Wektory MDI zrasteryzowane do 1 bitu dają ostry, spójny wygląd (jak w openHASP) na e-paperze.
 // =====================================================================================
 
 // Ramka sekcji z zaokrąglonymi rogami.
@@ -414,205 +416,89 @@ void drawSectionFrame(const int16_t x, const int16_t y, const int16_t width, con
     display.drawRoundRect(x, y, width, height, 10, GxEPD_BLACK);
 }
 
-// Ikona zegara: okrąg ze wskazówkami.
+// Rysuje ikonę MDI wyśrodkowaną w kwadratowym polu o boku iconSize (origin w lewym-górnym rogu pola).
+void drawMdiIcon(const int16_t originX, const int16_t originY, const int16_t iconSize, const mdi::Glyph& glyph) noexcept
+{
+    const int16_t drawX = static_cast<int16_t>(originX + (iconSize - glyph.width) / 2);
+    const int16_t drawY = static_cast<int16_t>(originY + (iconSize - glyph.height) / 2);
+    display.drawBitmap(drawX, drawY, glyph.bits, glyph.width, glyph.height, GxEPD_BLACK);
+}
+
+// Ikona zegara (sekcja daty).
 void drawClockIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t centerX = originX + iconSize / 2;
-    const int16_t centerY = originY + iconSize / 2;
-    const int16_t radius = iconSize / 2 - 1;
-    display.drawCircle(centerX, centerY, radius, GxEPD_BLACK);
-    display.drawLine(centerX, centerY, centerX, centerY - radius + 3, GxEPD_BLACK);
-    display.drawLine(centerX, centerY, centerX + radius - 4, centerY + 1, GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::CLOCK);
 }
 
-// Ikona prezentu do sekcji imienin.
+// Ikona prezentu (sekcja imienin).
 void drawGiftIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t lidHeight = std::max<int16_t>(4, iconSize / 5);
-    const int16_t boxTop = originY + lidHeight + 2;
-    const int16_t boxHeight = iconSize - lidHeight - 2;
-    const int16_t centerX = originX + iconSize / 2;
-    display.drawRect(originX, boxTop, iconSize, boxHeight, GxEPD_BLACK);
-    display.drawRect(originX - 1, originY + 2, iconSize + 2, lidHeight, GxEPD_BLACK);
-    display.drawFastVLine(centerX, boxTop, boxHeight, GxEPD_BLACK);
-    display.drawLine(centerX, originY + 2, centerX - iconSize / 4, originY - 2, GxEPD_BLACK);
-    display.drawLine(centerX, originY + 2, centerX + iconSize / 4, originY - 2, GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::GIFT);
 }
 
-// Ikona termometru do wartości "odczuwalna".
+// Ikona termometru (temperatura odczuwalna).
 void drawThermometerIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t centerX = originX + iconSize / 2;
-    display.drawRoundRect(centerX - 3, originY, 6, iconSize - 6, 3, GxEPD_BLACK);
-    display.fillCircle(centerX, originY + iconSize - 5, 5, GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::THERMOMETER);
 }
 
-// Ikona kropli do wilgotności.
+// Ikona kropli (wilgotność).
 void drawHumidityIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t centerX = originX + iconSize / 2;
-    const int16_t bottomY = originY + iconSize;
-    display.drawLine(centerX, originY, centerX - iconSize / 2, bottomY - iconSize / 3, GxEPD_BLACK);
-    display.drawLine(centerX, originY, centerX + iconSize / 2, bottomY - iconSize / 3, GxEPD_BLACK);
-    display.drawCircle(centerX, bottomY - iconSize / 3, iconSize / 3, GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::WATER_PERCENT);
 }
 
-// Ikona manometru do ciśnienia.
+// Ikona wskaźnika (ciśnienie).
 void drawPressureIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t centerX = originX + iconSize / 2;
-    const int16_t centerY = originY + iconSize / 2;
-    const int16_t radius = iconSize / 2 - 1;
-    display.drawCircle(centerX, centerY, radius, GxEPD_BLACK);
-    display.fillCircle(centerX, centerY, 2, GxEPD_BLACK);
-    display.drawLine(centerX, centerY, centerX + radius - 3, centerY - radius / 2, GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::GAUGE);
 }
 
-// Ikona WiFi: łuki i punkt bazowy.
+// Ikona WiFi (pasek statusu).
 void drawWifiIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t centerX = originX + iconSize / 2;
-    const int16_t centerY = originY + iconSize / 2 - 2;
-    display.drawCircle(centerX, centerY, std::max<int16_t>(2, iconSize / 10), GxEPD_BLACK);
-    display.drawCircle(centerX, centerY, std::max<int16_t>(5, iconSize / 4), GxEPD_BLACK);
-    display.drawCircle(centerX, centerY, std::max<int16_t>(8, iconSize / 3), GxEPD_BLACK);
-    display.fillRect(originX, centerY, iconSize, iconSize / 2 + 4, GxEPD_WHITE);
-    display.fillCircle(centerX, originY + iconSize - 3, std::max<int16_t>(2, iconSize / 9), GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::WIFI);
 }
 
-// Ikona globusa do statusu aktualizacji pogody.
+// Ikona aktualizacji danych pogodowych (pasek statusu).
 void drawGlobeIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t centerX = originX + iconSize / 2;
-    const int16_t centerY = originY + iconSize / 2;
-    const int16_t radius = iconSize / 2 - 1;
-    display.drawCircle(centerX, centerY, radius, GxEPD_BLACK);
-    display.drawFastHLine(centerX - radius, centerY, radius * 2, GxEPD_BLACK);
-    display.drawFastVLine(centerX, centerY - radius, radius * 2, GxEPD_BLACK);
-    display.drawFastVLine(centerX - radius / 2, centerY - radius + 3, radius * 2 - 6, GxEPD_BLACK);
-    display.drawFastVLine(centerX + radius / 2, centerY - radius + 3, radius * 2 - 6, GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::UPDATE);
 }
 
-// Ikona statusu NTP: tarcza z krzyżem i pierścieniem.
+// Ikona statusu NTP (pasek statusu).
 void drawNtpIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t centerX = originX + iconSize / 2;
-    const int16_t centerY = originY + iconSize / 2;
-    const int16_t outerRadius = std::max<int16_t>(8, iconSize / 3);
-    display.drawCircle(centerX, centerY, outerRadius, GxEPD_BLACK);
-    display.drawFastHLine(centerX - outerRadius + 2, centerY, outerRadius * 2 - 3, GxEPD_BLACK);
-    display.drawFastVLine(centerX, centerY - outerRadius + 2, outerRadius * 2 - 3, GxEPD_BLACK);
-    display.drawCircle(centerX, centerY, std::max<int16_t>(3, iconSize / 6), GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::CLOCK_CHECK);
 }
 
-// Ikona wschodu słońca: słońce nad horyzontem ze strzałką w górę.
+// Ikona wschodu słońca (pasek statusu).
 void drawSunriseIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t centerX = originX + iconSize / 2;
-    const int16_t horizonY = originY + iconSize / 2 + 4;
-    const int16_t radius = std::max<int16_t>(6, iconSize / 5);
-    display.drawFastHLine(originX + 2, horizonY, iconSize - 4, GxEPD_BLACK);
-    display.drawCircle(centerX, horizonY, radius, GxEPD_BLACK);
-    display.fillRect(originX + 2, horizonY, iconSize - 4, radius + 3, GxEPD_WHITE);
-    display.drawLine(centerX, originY + 2, centerX, originY + iconSize / 3, GxEPD_BLACK);
-    display.drawLine(centerX, originY + 2, centerX - 4, originY + 6, GxEPD_BLACK);
-    display.drawLine(centerX, originY + 2, centerX + 4, originY + 6, GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::SUNRISE);
 }
 
-// Ikona zachodu słońca: słońce nad horyzontem ze strzałką w dół.
+// Ikona zachodu słońca (pasek statusu).
 void drawSunsetIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
-    const int16_t centerX = originX + iconSize / 2;
-    const int16_t horizonY = originY + iconSize / 2 + 4;
-    const int16_t radius = std::max<int16_t>(6, iconSize / 5);
-    display.drawFastHLine(originX + 2, horizonY, iconSize - 4, GxEPD_BLACK);
-    display.drawCircle(centerX, horizonY, radius, GxEPD_BLACK);
-    display.fillRect(originX + 2, horizonY, iconSize - 4, radius + 3, GxEPD_WHITE);
-    display.drawLine(centerX, originY + 2, centerX, originY + iconSize / 3, GxEPD_BLACK);
-    display.drawLine(centerX, originY + iconSize / 3, centerX - 4, originY + iconSize / 3 - 4, GxEPD_BLACK);
-    display.drawLine(centerX, originY + iconSize / 3, centerX + 4, originY + iconSize / 3 - 4, GxEPD_BLACK);
+    drawMdiIcon(originX, originY, iconSize, mdi::SUNSET);
 }
 
-// Chmura z okręgów i zaokrąglonego prostokąta — element ikon pogodowych.
-void drawCloudShape(const int16_t originX, const int16_t originY, const int16_t unit) noexcept
-{
-    const int16_t left = originX + unit;
-    const int16_t top = originY + unit * 2;
-    display.drawCircle(left + unit * 2, top + unit, unit, GxEPD_BLACK);
-    display.drawCircle(left + unit * 4, top, unit + 2, GxEPD_BLACK);
-    display.drawCircle(left + unit * 6, top + unit, unit + 1, GxEPD_BLACK);
-    display.drawRoundRect(left, top + unit, unit * 7, unit * 3, unit, GxEPD_BLACK);
-}
-
-// Słońce z okręgu i promieni co 45 stopni.
-void drawSunShape(const int16_t centerX, const int16_t centerY, const int16_t radius) noexcept
-{
-    display.drawCircle(centerX, centerY, radius, GxEPD_BLACK);
-    for (int angle = 0; angle < 360; angle += 45) {
-        const float radians = static_cast<float>(angle) * 3.1415926f / 180.0f;
-        const int16_t innerX = static_cast<int16_t>(centerX + std::cos(radians) * (radius + 2));
-        const int16_t innerY = static_cast<int16_t>(centerY + std::sin(radians) * (radius + 2));
-        const int16_t outerX = static_cast<int16_t>(centerX + std::cos(radians) * (radius + 10));
-        const int16_t outerY = static_cast<int16_t>(centerY + std::sin(radians) * (radius + 10));
-        display.drawLine(innerX, innerY, outerX, outerY, GxEPD_BLACK);
-    }
-}
-
-// Ukośne kreski deszczu pod chmurą.
-void drawRainStrokes(const int16_t originX, const int16_t originY, const int16_t unit) noexcept
-{
-    for (int index = 0; index < 3; ++index) {
-        const int16_t strokeX = originX + unit * (2 + index * 2);
-        display.drawLine(strokeX, originY, strokeX - 4, originY + unit * 2, GxEPD_BLACK);
-    }
-}
-
-// Składa ikonę pogody z prymitywów zależnie od rodzaju zjawiska.
+// Składa ikonę pogody z bitmapy MDI dobranej do rodzaju zjawiska.
 void drawWeatherIcon(const int16_t originX, const int16_t originY, const int16_t iconSize, const WeatherIcon icon) noexcept
 {
-    const int16_t unit = std::max<int16_t>(4, iconSize / 10);
     switch (icon) {
-    case WeatherIcon::ClearDay:
-        drawSunShape(originX + iconSize / 2, originY + iconSize / 2, iconSize / 5);
-        break;
-    case WeatherIcon::ClearNight:
-        display.drawCircle(originX + iconSize / 2, originY + iconSize / 2, iconSize / 5, GxEPD_BLACK);
-        display.fillCircle(originX + iconSize / 2 + 8, originY + iconSize / 2 - 4, iconSize / 5, GxEPD_WHITE);
-        display.drawCircle(originX + iconSize / 2, originY + iconSize / 2, iconSize / 5, GxEPD_BLACK);
-        break;
-    case WeatherIcon::FewClouds:
-        drawSunShape(originX + iconSize / 3, originY + iconSize / 3, iconSize / 8);
-        drawCloudShape(originX + iconSize / 5, originY + iconSize / 3, unit);
-        break;
+    case WeatherIcon::ClearDay:        drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_SUNNY); break;
+    case WeatherIcon::ClearNight:      drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_NIGHT); break;
+    case WeatherIcon::FewClouds:       drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_PARTLY_CLOUDY); break;
     case WeatherIcon::ScatteredClouds:
-    case WeatherIcon::BrokenClouds:
-        drawCloudShape(originX + iconSize / 6, originY + iconSize / 3, unit + 1);
-        break;
-    case WeatherIcon::ShowerRain:
-    case WeatherIcon::Rain:
-        drawCloudShape(originX + iconSize / 6, originY + iconSize / 4, unit + 1);
-        drawRainStrokes(originX + iconSize / 6, originY + iconSize - unit * 3, unit + 1);
-        break;
-    case WeatherIcon::Thunderstorm:
-        drawCloudShape(originX + iconSize / 6, originY + iconSize / 4, unit + 1);
-        display.drawLine(originX + iconSize / 2, originY + iconSize / 2, originX + iconSize / 2 - 8, originY + iconSize - 14, GxEPD_BLACK);
-        display.drawLine(originX + iconSize / 2 - 8, originY + iconSize - 14, originX + iconSize / 2 + 2, originY + iconSize - 14, GxEPD_BLACK);
-        display.drawLine(originX + iconSize / 2 + 2, originY + iconSize - 14, originX + iconSize / 2 - 4, originY + iconSize - 2, GxEPD_BLACK);
-        break;
-    case WeatherIcon::Snow:
-        drawCloudShape(originX + iconSize / 6, originY + iconSize / 4, unit + 1);
-        display.drawLine(originX + iconSize / 2 - 10, originY + iconSize - 18, originX + iconSize / 2 + 10, originY + iconSize - 6, GxEPD_BLACK);
-        display.drawLine(originX + iconSize / 2 + 10, originY + iconSize - 18, originX + iconSize / 2 - 10, originY + iconSize - 6, GxEPD_BLACK);
-        display.drawLine(originX + iconSize / 2, originY + iconSize - 22, originX + iconSize / 2, originY + iconSize - 2, GxEPD_BLACK);
-        break;
-    case WeatherIcon::Mist:
-        for (int line = 0; line < 3; ++line) {
-            display.drawFastHLine(originX + 6, originY + iconSize / 3 + line * 10, iconSize - 12, GxEPD_BLACK);
-        }
-        break;
-    default:
-        drawCloudShape(originX + iconSize / 6, originY + iconSize / 3, unit);
-        break;
+    case WeatherIcon::BrokenClouds:    drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_CLOUDY); break;
+    case WeatherIcon::ShowerRain:      drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_POURING); break;
+    case WeatherIcon::Rain:            drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_RAINY); break;
+    case WeatherIcon::Thunderstorm:    drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_LIGHTNING); break;
+    case WeatherIcon::Snow:            drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_SNOWY); break;
+    case WeatherIcon::Mist:            drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_FOG); break;
+    default:                           drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_CLOUDY); break;
     }
 }
 
@@ -722,6 +608,85 @@ void drawCalendarSection(const int16_t x,
                 drawTextCentered(cellX, cellWidth, rowTop, label, kTextScaleTiny);
             }
         }
+    }
+}
+
+// Rysuje trójkątną strzałkę trendu (w górę = wzrost, w dół = spadek kursu).
+void drawTrendArrow(const int16_t x, const int16_t topY, const int16_t size, const bool up) noexcept
+{
+    if (up) {
+        display.fillTriangle(x, topY + size, x + size, topY + size, x + size / 2, topY, GxEPD_BLACK);
+    } else {
+        display.fillTriangle(x, topY, x + size, topY, x + size / 2, topY + size, GxEPD_BLACK);
+    }
+}
+
+// Rysuje jeden wpis zmiany procentowej w formacie "1m/1.5%" ze strzałką trendu.
+void drawCurrencyChange(const int16_t x, const int16_t topY, const char* period,
+                        const bool has, const float percent) noexcept
+{
+    if (!has) {
+        drawText(x, topY, std::string(period) + "/--", kTextScaleTiny);
+        return;
+    }
+    const bool up = percent >= 0.0f;
+    const int16_t arrowSize = 9;
+    const int16_t arrowTop = static_cast<int16_t>(topY + (glyphHeightAt(kTextScaleTiny) - arrowSize) / 2);
+    drawTrendArrow(x, arrowTop, arrowSize, up);
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "%s/%.1f%%", period, std::fabs(percent));
+    drawText(static_cast<int16_t>(x + arrowSize + 4), topY, buf, kTextScaleTiny);
+}
+
+// Górny-prawy panel: kursy walut (EUR, USD, CHF) względem PLN z procentową zmianą 1 i 6 miesięcy.
+void drawCurrencySection(const int16_t x,
+                         const int16_t y,
+                         const int16_t width,
+                         const int16_t height,
+                         const std::vector<CurrencyRate>& currencies) noexcept
+{
+    drawSectionFrame(x, y, width, height);
+    drawTextCentered(x, width, y + 14, "WALUTY", kTextScaleBody);
+
+    const int16_t contentTop = y + 44;
+    const int16_t contentBottom = y + height - 8;
+    constexpr size_t rowCount = 3;
+    const int16_t rowHeight = static_cast<int16_t>((contentBottom - contentTop) / rowCount);
+    const int16_t halfWidth = static_cast<int16_t>((width - 24) / 2);
+
+    for (size_t index = 0; index < rowCount; ++index) {
+        const int16_t rowTop = static_cast<int16_t>(contentTop + static_cast<int16_t>(index) * rowHeight);
+        if (index > 0) {
+            display.drawFastHLine(x + 12, rowTop, width - 24, GxEPD_BLACK);
+        }
+
+        std::string code = "---";
+        std::string rateText = "--";
+        bool has1m = false;
+        bool has6m = false;
+        float change1m = 0.0f;
+        float change6m = 0.0f;
+        if (index < currencies.size()) {
+            const CurrencyRate& entry = currencies[index];
+            code = entry.code;
+            if (entry.valid) {
+                char rateBuf[16];
+                std::snprintf(rateBuf, sizeof(rateBuf), "%.3f zł", entry.rate);
+                rateText = rateBuf;
+            }
+            has1m = entry.has1m;
+            change1m = entry.change1m;
+            has6m = entry.has6m;
+            change6m = entry.change6m;
+        }
+
+        const int16_t line1Top = static_cast<int16_t>(rowTop + 6);
+        drawText(x + 14, line1Top, code, kTextScaleValue);
+        drawTextRightAligned(static_cast<int16_t>(x + width - 14), line1Top, rateText, kTextScaleValue);
+
+        const int16_t line2Top = static_cast<int16_t>(line1Top + 24);
+        drawCurrencyChange(static_cast<int16_t>(x + 14), line2Top, "1m", has1m, change1m);
+        drawCurrencyChange(static_cast<int16_t>(x + 14 + halfWidth), line2Top, "6m", has6m, change6m);
     }
 }
 
@@ -896,6 +861,7 @@ struct DashboardLayout
     SectionRect clock;
     SectionRect nameday;
     SectionRect calendar;
+    SectionRect currency;
     SectionRect weather;
     SectionRect forecast;
     SectionRect status;
@@ -937,6 +903,8 @@ DashboardLayout computeLayout() noexcept
     layout.clock    = {clockX, topY, clockWidth, topHeight};
     layout.nameday  = {namedayX, topY, namedayWidth, topHeight};
     layout.calendar = {calendarX, topY, calendarWidth, topHeight};
+    // Widget Waluty zajmuje ten sam obszar co (wypięty) kalendarz.
+    layout.currency = {calendarX, topY, calendarWidth, topHeight};
     layout.weather  = {weatherX, middleY, weatherWidth, middleHeight};
     layout.forecast = {forecastX, middleY, forecastWidth, middleHeight};
     layout.status   = {statusX, statusY, statusWidth, statusHeight};
@@ -949,6 +917,7 @@ const SectionRect* regionForWidget(const std::string& widgetId, const DashboardL
     if (widgetId == "clock_widget")      return &layout.clock;
     if (widgetId == "nameday_widget")    return &layout.nameday;
     if (widgetId == "calendar_widget")   return &layout.calendar;
+    if (widgetId == "currency_widget")   return &layout.currency;
     if (widgetId == "weather_widget")    return &layout.weather;
     if (widgetId == "forecast_widget")   return &layout.forecast;
     if (widgetId == "status_bar_widget") return &layout.status;
@@ -966,6 +935,8 @@ void drawWidgetSection(const std::string& widgetId,
         drawNamedaySection(layout.nameday.x, layout.nameday.y, layout.nameday.width, layout.nameday.height, state.namedays);
     } else if (widgetId == "calendar_widget") {
         drawCalendarSection(layout.calendar.x, layout.calendar.y, layout.calendar.width, layout.calendar.height, state.calendarMonth, state.date);
+    } else if (widgetId == "currency_widget") {
+        drawCurrencySection(layout.currency.x, layout.currency.y, layout.currency.width, layout.currency.height, state.currencies);
     } else if (widgetId == "weather_widget") {
         drawCurrentWeatherSection(layout.weather.x, layout.weather.y, layout.weather.width, layout.weather.height, state.weather);
     } else if (widgetId == "forecast_widget") {
@@ -989,7 +960,10 @@ void drawDashboard(const Dashboard& dashboard)
 
     drawClockSection(layout.clock.x, layout.clock.y, layout.clock.width, layout.clock.height, state.time, state.date);
     drawNamedaySection(layout.nameday.x, layout.nameday.y, layout.nameday.width, layout.nameday.height, state.namedays);
-    drawCalendarSection(layout.calendar.x, layout.calendar.y, layout.calendar.width, layout.calendar.height, state.calendarMonth, state.date);
+    // Widget Kalendarz zastąpiony widgetem Waluty. Aby przywrócić kalendarz, odkomentuj poniższą
+    // linię i zakomentuj drawCurrencySection (oraz analogicznie w main.cpp / drawWidgetSection).
+    // drawCalendarSection(layout.calendar.x, layout.calendar.y, layout.calendar.width, layout.calendar.height, state.calendarMonth, state.date);
+    drawCurrencySection(layout.currency.x, layout.currency.y, layout.currency.width, layout.currency.height, state.currencies);
     drawCurrentWeatherSection(layout.weather.x, layout.weather.y, layout.weather.width, layout.weather.height, state.weather);
     drawForecastSection(layout.forecast.x, layout.forecast.y, layout.forecast.width, layout.forecast.height, state.forecast);
     drawStatusBar(layout.status.x, layout.status.y, layout.status.width, layout.status.height, state);

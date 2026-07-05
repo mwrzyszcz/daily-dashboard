@@ -133,6 +133,22 @@ JsonDocument buildForecastFilter()
     filter["city"]["sunset"] = true;
     return filter;
 }
+
+JsonDocument buildCurrentWeatherFilter()
+{
+    JsonDocument filter;
+    filter["main"]["temp"] = true;
+    filter["main"]["feels_like"] = true;
+    filter["main"]["temp_min"] = true;
+    filter["main"]["temp_max"] = true;
+    filter["main"]["humidity"] = true;
+    filter["main"]["pressure"] = true;
+    filter["weather"][0]["icon"] = true;
+    filter["weather"][0]["description"] = true;
+    filter["sys"]["sunrise"] = true;
+    filter["sys"]["sunset"] = true;
+    return filter;
+}
 }
 
 static WeatherIcon iconFromString(const std::string& icon)
@@ -152,18 +168,45 @@ static WeatherIcon iconFromString(const std::string& icon)
 
 Weather WeatherParser::parseCurrentWeather(const std::string& json) const
 {
-    (void)json;
     Weather weather;
-    weather.temperature = 18.3f;
-    weather.feelsLike = 17.8f;
-    weather.tempMin = 16.0f;
-    weather.tempMax = 19.2f;
-    weather.humidity = 62;
-    weather.pressure = 1014;
-    weather.sunrise = 1624935600;
-    weather.sunset = 1624990800;
-    weather.icon = iconFromString("02d");
-    weather.description = "Lekko zachmurzone";
+    if (json.empty()) {
+        Logger::warn("WeatherParser", "Current weather payload is empty");
+        return weather;
+    }
+
+    JsonDocument filter = buildCurrentWeatherFilter();
+    JsonDocument doc;
+    const DeserializationError error = deserializeJson(doc,
+                                                       json.c_str(),
+                                                       DeserializationOption::Filter(filter));
+    if (error) {
+        Logger::error("WeatherParser", std::string("Current weather JSON parse failed: ") + error.c_str());
+        return weather;
+    }
+
+    JsonObject main = doc["main"].as<JsonObject>();
+    if (main.isNull()) {
+        Logger::warn("WeatherParser", "Current weather payload has no main object");
+        return weather;
+    }
+
+    weather.temperature = main["temp"] | 0.0f;
+    weather.feelsLike = main["feels_like"] | weather.temperature;
+    weather.tempMin = main["temp_min"] | weather.temperature;
+    weather.tempMax = main["temp_max"] | weather.temperature;
+    weather.humidity = static_cast<uint8_t>(main["humidity"] | 0);
+    weather.pressure = static_cast<uint16_t>(main["pressure"] | 0);
+    weather.sunrise = doc["sys"]["sunrise"] | 0U;
+    weather.sunset = doc["sys"]["sunset"] | 0U;
+
+    const char* iconText = doc["weather"][0]["icon"] | "";
+    weather.icon = iconFromString(iconText);
+    weather.description = doc["weather"][0]["description"] | "";
+
+    char summary[48];
+    std::snprintf(summary, sizeof(summary), "Current temp parsed=%.1f", weather.temperature);
+    Logger::info("WeatherParser", summary);
+
     return weather;
 }
 

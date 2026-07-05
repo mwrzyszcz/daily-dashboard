@@ -27,3 +27,6 @@ logs/
 Thumbs.db
 *.swp
 *~
+
+# Pobierany font MDI (cache generatora ikon)
+tools/.mdi-cache/

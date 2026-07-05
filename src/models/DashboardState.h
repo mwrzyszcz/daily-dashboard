@@ -8,6 +8,7 @@
 #include "Forecast.h"
 #include "Holiday.h"
 #include "models/CalendarMonth.h"
+#include "models/Currency.h"
 
 /**
  * @brief Zawiera wszystkie dane potrzebne do renderowania pulpitu.
@@ -26,4 +27,7 @@ struct DashboardState
     CalendarMonth calendarMonth;
     std::vector<std::string> namedays;
     Holiday holiday;  // Now includes isPublicHoliday flag
+
+    // Kursy walut (EUR, USD, CHF) względem PLN — sekcja "Waluty".
+    std::vector<CurrencyRate> currencies;
 };

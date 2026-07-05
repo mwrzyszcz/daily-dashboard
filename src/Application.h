@@ -11,6 +11,7 @@
 #include "services/CalendarService.h"
 #include "services/HolidayService.h"
 #include "services/NamedayService.h"
+#include "services/CurrencyService.h"
 
 /**
  * @brief Główna klasa aplikacji.
@@ -31,7 +32,8 @@ public:
                 IWeatherService& weatherService,
                 CalendarService& calendarService,
                 HolidayService& holidayService,
-                NamedayService& namedayService) noexcept;
+                NamedayService& namedayService,
+                CurrencyService& currencyService) noexcept;
     ~Application() = default;
 
     void setup() noexcept;
@@ -46,6 +48,7 @@ private:
     void updateClock() noexcept;
     void refreshWeather() noexcept;
     void refreshNameday() noexcept;
+    void refreshCurrency() noexcept;
 
     Configuration& configuration_;
     Dashboard& dashboard_;
@@ -55,6 +58,7 @@ private:
     CalendarService& calendarService_;
     HolidayService& holidayService_;
     NamedayService& namedayService_;
+    CurrencyService& currencyService_;
     
     Scheduler scheduler_;
     uint8_t lastDisplayedMinute_ = 255;  // 255 = not yet rendered

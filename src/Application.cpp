@@ -31,7 +31,8 @@ Application::Application(Configuration& configuration,
                          IWeatherService& weatherService,
                          CalendarService& calendarService,
                          HolidayService& holidayService,
-                         NamedayService& namedayService) noexcept
+                         NamedayService& namedayService,
+                         CurrencyService& currencyService) noexcept
     : configuration_(configuration)
     , dashboard_(dashboard)
     , display_(display)
@@ -40,6 +41,7 @@ Application::Application(Configuration& configuration,
     , calendarService_(calendarService)
     , holidayService_(holidayService)
     , namedayService_(namedayService)
+    , currencyService_(currencyService)
 {
 }
 
@@ -148,6 +150,9 @@ void Application::initializeScheduler() noexcept
     scheduler_.everyMinutes(configuration_.getWeatherRefreshMinutes(), [this]() {
         refreshWeather();
     });
+    scheduler_.everyMinutes(configuration_.getCurrencyRefreshMinutes(), [this]() {
+        refreshCurrency();
+    });
     // Imieniny, kalendarz i święta odświeżane są chwilę po północy przy zmianie daty (patrz updateClock()),
     // dlatego nie ma tu osobnego zadania czasowego.
 }
@@ -164,6 +169,8 @@ void Application::refreshDashboardState() noexcept
     state.forecast = weatherService_.getForecast();
     state.weatherUpdatedDate = currentDate;
     state.weatherUpdatedTime = currentTime;
+
+    state.currencies = currencyService_.getCurrencies();
 
     if (isValidDate(currentDate)) {
         state.calendarMonth = calendarService_.getCurrentMonth(currentDate);
@@ -214,6 +221,17 @@ void Application::refreshWeather() noexcept
     if (Widget* w = dashboard_.getWidget("weather_widget"))  w->invalidate();
     if (Widget* w = dashboard_.getWidget("forecast_widget")) w->invalidate();
     if (Widget* w = dashboard_.getWidget("status_bar_widget")) w->invalidate();
+    display_.partialUpdate(dashboard_);
+}
+
+// Odświeża kursy walut (EUR, USD, CHF) względem PLN. Wołane co 6 godzin ze schedulera.
+void Application::refreshCurrency() noexcept
+{
+    DashboardState state = dashboard_.getState();
+    state.currencies = currencyService_.getCurrencies();
+
+    dashboard_.setState(std::move(state));
+    if (Widget* w = dashboard_.getWidget("currency_widget")) w->invalidate();
     display_.partialUpdate(dashboard_);
 }
 
