@@ -7,12 +7,34 @@
 // (oszczędność Flash) — wybór kompilacyjny, bez przełączania w runtime.
 //
 // Wybór rodziny (platformio.ini):
-//   -D FONT_FAMILY=Roboto         (klasyczny, neutralny — „domyślny” wygląd)
+//   -D FONT_FAMILY=Helvetica      (domyślna, klasyczny renderer U8g2 — bez offline rasteryzacji)
+//   -D FONT_FAMILY=Roboto         (klasyczny, neutralny)
 //   -D FONT_FAMILY=Inter
 //   -D FONT_FAMILY=JetBrainsMono
 //   -D FONT_FAMILY=Atkinson
 //
-// Renderowanie tekstu (Display.cpp) pobiera font przez bodyFont()/clockFont()/temperatureFont().
+// Renderowanie tekstu (Display.cpp) pobiera font przez bodyFont()/clockFont()/temperatureFont()
+// (rodziny bitmapowe) albo używa wbudowanych fontów U8g2 (gdy FONT_USE_U8G2).
+
+#ifndef FONT_FAMILY
+#define FONT_FAMILY Inter
+#endif
+
+// Identyfikatory rodzin (do dyrektyw #if) — współdzielone przez Display.cpp i Fonts.cpp.
+#define FF_Inter 0
+#define FF_JetBrainsMono 1
+#define FF_Atkinson 2
+#define FF_Roboto 3
+#define FF_Helvetica 4
+#define FF_PASTE_(a, b) a##b
+#define FF_PASTE(a, b) FF_PASTE_(a, b)
+#define FONT_FAMILY_ID FF_PASTE(FF_, FONT_FAMILY)
+
+// FONT_FAMILY=Helvetica → klasyczny renderer U8g2 (wbudowane fonty, bez plików src/fonts/generated).
+#if FONT_FAMILY_ID == FF_Helvetica
+#define FONT_USE_U8G2 1
+#endif
+
 namespace fonts
 {
 
@@ -22,6 +44,7 @@ enum class Family : uint8_t
     JetBrainsMono,
     Atkinson,
     Roboto,
+    Helvetica,
     Count
 };
 
