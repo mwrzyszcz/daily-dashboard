@@ -6,7 +6,7 @@
 #include <SPI.h>
 #include <WiFi.h>
 #include <GxEPD2_BW.h>
-#include "fonts/Fonts.h"
+#include <U8g2_for_Adafruit_GFX.h>
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -70,9 +70,9 @@ namespace
 GxEPD2_BW<DISPLAY_MODEL_CLASS, DISPLAY_MODEL_CLASS::HEIGHT> display(
     DISPLAY_MODEL_CLASS(DISPLAY_PIN_CS, DISPLAY_PIN_DC, DISPLAY_PIN_RST, DISPLAY_PIN_BUSY));
 
-// Tekst renderowany prerasteryzowanymi fontami bitmapowymi 1-bit (src/fonts) — pełna obsługa
-// polskich znaków (UTF-8), ostre natywne rozmiary bez skalowania, przełączalne rodziny fontów.
-// Glify rysowane tą samą ścieżką co ikony MDI: Adafruit_GFX::drawBitmap (tło przezroczyste).
+// Wysokiej jakości renderer fontów U8g2 na buforze GxEPD2 — pełna obsługa polskich znaków (UTF-8),
+// ostre natywne rozmiary bez skalowania. To standardowe rozwiązanie fontowe dla GxEPD2.
+U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;
 
 // =====================================================================================
 //  Skala tekstu 
@@ -123,93 +123,50 @@ size_t utf8Length(const std::string& text) noexcept
 // Wysokość odniesienia (bazowa skala 34 px) — do mapowania współczynnika skali na natywny font U8g2.
 constexpr float kReferenceCellHeight = 34.0f;
 
-// Wyszukuje glif dla punktu kodowego (glify posortowane rosnąco → wyszukiwanie binarne).
-const fonts::GlyphInfo* findGlyph(const fonts::BitmapFont& font, const uint32_t codepoint) noexcept
+// Dobiera natywny font U8g2 (ostry, z pełnym zestawem polskich znaków) najbliższy docelowej skali.
+const uint8_t* fontForScale(const float textScale) noexcept
 {
-    int lo = 0;
-    int hi = static_cast<int>(font.glyphCount) - 1;
-    while (lo <= hi) {
-        const int mid = (lo + hi) / 2;
-        const uint16_t candidate = font.glyphs[mid].codepoint;
-        if (candidate == codepoint) return &font.glyphs[mid];
-        if (candidate < codepoint) lo = mid + 1; else hi = mid - 1;
-    }
-    return nullptr;
-}
-
-// Font tekstu z aktywnej rodziny dobrany do docelowej wysokości (px) dla danej skali.
-const fonts::BitmapFont& fontForScale(const float textScale) noexcept
-{
-    const int targetHeight = static_cast<int>(std::lround(kReferenceCellHeight * textScale));
-    return fonts::bodyFont(targetHeight);
+    const int16_t targetHeight = static_cast<int16_t>(std::lround(kReferenceCellHeight * textScale));
+    if (targetHeight <= 13) return u8g2_font_helvR10_te; // etykiety, drobne opisy
+    if (targetHeight <= 16) return u8g2_font_helvR12_te; // opisy
+    if (targetHeight <= 18) return u8g2_font_helvB12_te; // nagłówki sekcji (pogrubione)
+    if (targetHeight <= 21) return u8g2_font_helvB14_te; // wyróżnione wartości
+    if (targetHeight <= 24) return u8g2_font_helvB18_te; // imieniny
+    return u8g2_font_helvB24_te;                          // temperatura bieżąca
 }
 
 // Wysokość pojedynczego wiersza tekstu (ascent + descent) dla zadanej skali.
 int16_t glyphHeightAt(const float textScale) noexcept
 {
-    const fonts::BitmapFont& font = fontForScale(textScale);
-    return static_cast<int16_t>(font.ascent + font.descent);
+    u8g2Fonts.setFont(fontForScale(textScale));
+    return static_cast<int16_t>(u8g2Fonts.getFontAscent() - u8g2Fonts.getFontDescent());
 }
 
 // Ascent (odległość od linii bazowej do góry glifu) — do wyrównywania tekstów o różnych rozmiarach.
 int16_t glyphAscentAt(const float textScale) noexcept
 {
-    return static_cast<int16_t>(fontForScale(textScale).ascent);
+    u8g2Fonts.setFont(fontForScale(textScale));
+    return static_cast<int16_t>(u8g2Fonts.getFontAscent());
 }
 
-// Szerokość napisu (px) dla konkretnego fontu — suma przesunięć kursora (UTF-8).
-int16_t measureText(const std::string& text, const fonts::BitmapFont& font) noexcept
-{
-    int32_t width = 0;
-    const char* cursor = text.c_str();
-    while (*cursor != '\0') {
-        const uint32_t codepoint = nextUtf8Codepoint(cursor);
-        const fonts::GlyphInfo* glyph = findGlyph(font, codepoint);
-        if (glyph == nullptr) glyph = findGlyph(font, static_cast<uint32_t>('?'));
-        if (glyph != nullptr) width += glyph->xAdvance;
-    }
-    return static_cast<int16_t>(width);
-}
-
-// Zwraca szerokość napisu w pikselach dla zadanej skali tekstu.
+// Zwraca szerokość napisu w pikselach dla zadanej skali tekstu (proporcjonalny font U8g2).
 int16_t textWidth(const std::string& text, const float textScale) noexcept
 {
-    return measureText(text, fontForScale(textScale));
+    u8g2Fonts.setFont(fontForScale(textScale));
+    return u8g2Fonts.getUTF8Width(text.c_str());
 }
 
-// Rysuje napis danym fontem: górna krawędź w topY, od originX; tło przezroczyste (tylko piksele glifu).
-void drawTextWithFont(const int16_t originX,
-                      const int16_t topY,
-                      const std::string& text,
-                      const fonts::BitmapFont& font,
-                      const uint16_t color) noexcept
-{
-    const int16_t baseline = static_cast<int16_t>(topY + font.ascent);
-    int16_t penX = originX;
-    const char* cursor = text.c_str();
-    while (*cursor != '\0') {
-        const uint32_t codepoint = nextUtf8Codepoint(cursor);
-        const fonts::GlyphInfo* glyph = findGlyph(font, codepoint);
-        if (glyph == nullptr) glyph = findGlyph(font, static_cast<uint32_t>('?'));
-        if (glyph == nullptr) continue;
-        if (glyph->width > 0 && glyph->height > 0) {
-            display.drawBitmap(static_cast<int16_t>(penX + glyph->xOffset),
-                               static_cast<int16_t>(baseline - glyph->yOffset),
-                               font.bitmap + glyph->bitmapOffset,
-                               glyph->width, glyph->height, color);
-        }
-        penX = static_cast<int16_t>(penX + glyph->xAdvance);
-    }
-}
-
-// Rysuje napis od lewej krawędzi (originX) z górną krawędzią w topY, fontem dobranym do skali (UTF-8).
+// Rysuje napis od lewej krawędzi (originX) z górną krawędzią w topY, natywnym fontem U8g2 (ostro, UTF-8).
 void drawText(const int16_t originX,
               const int16_t topY,
               const std::string& text,
               const float textScale,
               const uint16_t color = GxEPD_BLACK) noexcept
 {
-    drawTextWithFont(originX, topY, text, fontForScale(textScale), color);
+    u8g2Fonts.setFont(fontForScale(textScale));
+    u8g2Fonts.setFontMode(1); // setFont() resetuje tryb na solid — wymuś przezroczystość, inaczej glify to czarne prostokąty
+    u8g2Fonts.setForegroundColor(color);
+    u8g2Fonts.drawUTF8(originX, static_cast<int16_t>(topY + u8g2Fonts.getFontAscent()), text.c_str());
 }
 
 // Rysuje napis wyśrodkowany w prostokącie o zadanej szerokości.
@@ -332,40 +289,51 @@ int16_t drawWrappedTextCentered(const int16_t regionX,
     return lineTop;
 }
 
-// Rysuje wielki zegar prerasteryzowanym fontem bitmapowym (cyfry i dwukropek), ostre krawędzie.
+// Wielki font zegara — czytelny, natywny rozmiar U8g2 (cyfry i dwukropek), ostre krawędzie.
+const uint8_t* const kClockFont = u8g2_font_logisoso78_tn;
+
+// Rysuje wielki zegar natywnym fontem U8g2 (bez skalowania, ostre krawędzie).
 void drawClockDigits(const int16_t originX, const int16_t topY, const std::string& text) noexcept
 {
-    drawTextWithFont(originX, topY, text, fonts::clockFont(), GxEPD_BLACK);
+    u8g2Fonts.setFont(kClockFont);
+    u8g2Fonts.setFontMode(1); // setFont() resetuje tryb na solid — wymuś przezroczystość, inaczej cyfry to czarne prostokąty
+    u8g2Fonts.setForegroundColor(GxEPD_BLACK);
+    u8g2Fonts.drawUTF8(originX, static_cast<int16_t>(topY + u8g2Fonts.getFontAscent()), text.c_str());
 }
 
 // Szerokość napisu zegara w pikselach.
 int16_t clockDigitsWidth(const std::string& text) noexcept
 {
-    return measureText(text, fonts::clockFont());
+    u8g2Fonts.setFont(kClockFont);
+    return u8g2Fonts.getUTF8Width(text.c_str());
 }
 
-// Fonty temperatury z aktywnej rodziny: prognoza (kafelki dni) i większa aktualna pogoda.
-inline const fonts::BitmapFont& forecastTempFont() noexcept { return fonts::temperatureFont(false); }
-inline const fonts::BitmapFont& currentTempFont() noexcept  { return fonts::temperatureFont(true); }
+// Dedykowany, powiększony font wskaźnika aktualnej temperatury (cyfry, znak stopnia i litery).
+const uint8_t* const kTemperatureFont = u8g2_font_fub30_tf;  // prognoza (kafelki dni)
+const uint8_t* const kCurrentTempFont = u8g2_font_fub35_tf;  // aktualna pogoda (jeszcze większa)
 
-// Rysuje wyróżnioną, dużą temperaturę (ostro, UTF-8, tło przezroczyste).
+// Rysuje wyróżnioną, dużą temperaturę bieżącą natywnym fontem U8g2 (ostro, UTF-8).
 void drawTemperatureText(const int16_t originX, const int16_t topY, const std::string& text,
-                         const fonts::BitmapFont& font = forecastTempFont()) noexcept
+                         const uint8_t* font = kTemperatureFont) noexcept
 {
-    drawTextWithFont(originX, topY, text, font, GxEPD_BLACK);
+    u8g2Fonts.setFont(font);
+    u8g2Fonts.setFontMode(1); // setFont() resetuje tryb na solid — wymuś przezroczystość
+    u8g2Fonts.setForegroundColor(GxEPD_BLACK);
+    u8g2Fonts.drawUTF8(originX, static_cast<int16_t>(topY + u8g2Fonts.getFontAscent()), text.c_str());
 }
 
 // Szerokość napisu temperatury w pikselach.
-int16_t temperatureTextWidth(const std::string& text,
-                             const fonts::BitmapFont& font = forecastTempFont()) noexcept
+int16_t temperatureTextWidth(const std::string& text, const uint8_t* font = kTemperatureFont) noexcept
 {
-    return measureText(text, font);
+    u8g2Fonts.setFont(font);
+    return u8g2Fonts.getUTF8Width(text.c_str());
 }
 
 // Ascent dużego fontu temperatury — do wyrównania z mniejszym tekstem do wspólnej linii bazowej.
-int16_t temperatureAscent(const fonts::BitmapFont& font = forecastTempFont()) noexcept
+int16_t temperatureAscent(const uint8_t* font = kTemperatureFont) noexcept
 {
-    return static_cast<int16_t>(font.ascent);
+    u8g2Fonts.setFont(font);
+    return static_cast<int16_t>(u8g2Fonts.getFontAscent());
 }
 
 // =====================================================================================
@@ -763,10 +731,10 @@ void drawCurrentWeatherSection(const int16_t x,
     const int16_t tempX = x + 12 + iconSize + 8;
     const int16_t tempMaxWidth = dividerX - tempX - 6;
     const std::string tempText = formatTemperature(weather.temperature);
-    if (temperatureTextWidth(tempText, currentTempFont()) <= tempMaxWidth) {
-        drawTemperatureText(tempX, y + 46, tempText, currentTempFont());
-    } else if (temperatureTextWidth(tempText, forecastTempFont()) <= tempMaxWidth) {
-        drawTemperatureText(tempX, y + 52, tempText, forecastTempFont());
+    if (temperatureTextWidth(tempText, kCurrentTempFont) <= tempMaxWidth) {
+        drawTemperatureText(tempX, y + 46, tempText, kCurrentTempFont);
+    } else if (temperatureTextWidth(tempText, kTemperatureFont) <= tempMaxWidth) {
+        drawTemperatureText(tempX, y + 52, tempText, kTemperatureFont);
     } else {
         drawText(tempX, y + 60, fitText(tempText, tempMaxWidth, kTextScaleTemp), kTextScaleTemp);
     }
@@ -1057,8 +1025,11 @@ void Display::init() noexcept
     display.setRotation(2);
     display.setTextColor(GxEPD_BLACK);
 
-    // Tekst: prerasteryzowane fonty bitmapowe 1-bit (src/fonts) rysowane przez drawBitmap (tło przezroczyste).
-    Logger::info("Display", fonts::familyName(fonts::activeFamily()));
+    u8g2Fonts.begin(display);          // podłącz renderer fontów U8g2 do bufora GxEPD2
+    u8g2Fonts.setFontMode(1);          // tło przezroczyste — rysuje tylko piksele glifu
+    u8g2Fonts.setFontDirection(0);
+    u8g2Fonts.setForegroundColor(GxEPD_BLACK);
+    u8g2Fonts.setBackgroundColor(GxEPD_WHITE); // zabezpieczenie: gdyby tryb solid się włączył, tło jest białe a nie czarne
     char dimensions[64];
     std::snprintf(dimensions, sizeof(dimensions), "Display geometry %dx%d", display.width(), display.height());
     Logger::info("Display", dimensions);
