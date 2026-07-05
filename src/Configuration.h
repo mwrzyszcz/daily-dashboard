@@ -14,8 +14,6 @@ public:
 
     void load() noexcept;
 
-    unsigned long getRefreshIntervalMs() const noexcept;
-
     // Interwały odświeżania poszczególnych widgetów (konfigurowalne).
     uint16_t getClockRefreshMinutes() const noexcept;
     uint16_t getWeatherRefreshMinutes() const noexcept;
@@ -28,10 +26,8 @@ public:
     float getLongitude() const noexcept;
     const std::string& getLanguage() const noexcept;
     const std::string& getUnits() const noexcept;
-    const std::string& getTimezone() const noexcept;
 
 private:
-    unsigned long refreshIntervalMs_ = 30000UL;
     uint16_t clockRefreshMinutes_ = 1;     // zegar odświeża się co 1 minutę
     uint16_t weatherRefreshMinutes_ = 60;  // pogoda i prognoza co 1 godzinę
     uint16_t currencyRefreshMinutes_ = 360; // waluty co 6 godzin
@@ -42,5 +38,4 @@ private:
     float longitude_ = 0.0f;
     std::string language_;
     std::string units_;
-    std::string timezone_;
 };

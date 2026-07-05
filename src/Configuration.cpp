@@ -2,7 +2,6 @@
 
 void Configuration::load() noexcept
 {
-    refreshIntervalMs_ = 10000UL;
     wifiSSID_ = "changeme";
     wifiPassword_ = "changeme";
     openWeatherApiKey_ = "changeme";
@@ -10,12 +9,6 @@ void Configuration::load() noexcept
     longitude_ = 22.5684f;
     language_ = "pl";
     units_ = "metric";
-    timezone_ = "Europe/Warsaw";
-}
-
-unsigned long Configuration::getRefreshIntervalMs() const noexcept
-{
-    return refreshIntervalMs_;
 }
 
 uint16_t Configuration::getClockRefreshMinutes() const noexcept
@@ -66,9 +59,4 @@ const std::string& Configuration::getLanguage() const noexcept
 const std::string& Configuration::getUnits() const noexcept
 {
     return units_;
-}
-
-const std::string& Configuration::getTimezone() const noexcept
-{
-    return timezone_;
 }
