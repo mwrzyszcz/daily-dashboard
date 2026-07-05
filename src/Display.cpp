@@ -454,6 +454,12 @@ void drawPressureIcon(const int16_t originX, const int16_t originY, const int16_
     drawMdiIcon(originX, originY, iconSize, mdi::GAUGE);
 }
 
+// Ikona wiatru (prędkość wiatru).
+void drawWindIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
+{
+    drawMdiIcon(originX, originY, iconSize, mdi::WEATHER_WINDY);
+}
+
 // Ikona WiFi (pasek statusu).
 void drawWifiIcon(const int16_t originX, const int16_t originY, const int16_t iconSize) noexcept
 {
@@ -739,9 +745,12 @@ void drawCurrentWeatherSection(const int16_t x,
 
     const int16_t metricX = dividerX + 14;
     const int16_t metricWidth = x + width - metricX - 10;
-    drawWeatherMetric(metricX, y + 26, metricWidth, "Odczuwalna", formatTemperature(weather.feelsLike), drawThermometerIcon);
-    drawWeatherMetric(metricX, y + 90, metricWidth, "Wilgotność", std::to_string(weather.humidity) + "%", drawHumidityIcon);
-    drawWeatherMetric(metricX, y + 154, metricWidth, "Ciśnienie", std::to_string(weather.pressure) + " hPa", drawPressureIcon);
+    drawWeatherMetric(metricX, y + 22, metricWidth, "Odczuwalna", formatTemperature(weather.feelsLike), drawThermometerIcon);
+    drawWeatherMetric(metricX, y + 70, metricWidth, "Wilgotność", std::to_string(weather.humidity) + "%", drawHumidityIcon);
+    drawWeatherMetric(metricX, y + 118, metricWidth, "Ciśnienie", std::to_string(weather.pressure) + " hPa", drawPressureIcon);
+    char windValue[16];
+    std::snprintf(windValue, sizeof(windValue), "%.1f m/s", weather.windSpeed);
+    drawWeatherMetric(metricX, y + 166, metricWidth, "Wiatr", windValue, drawWindIcon);
 }
 
 // Środkowy-prawy panel: prognoza na trzy dni w kolumnach (dzień, data, ikona, zakres temperatur).

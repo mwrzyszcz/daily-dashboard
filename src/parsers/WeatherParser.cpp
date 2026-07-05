@@ -143,6 +143,7 @@ JsonDocument buildCurrentWeatherFilter()
     filter["main"]["temp_max"] = true;
     filter["main"]["humidity"] = true;
     filter["main"]["pressure"] = true;
+    filter["wind"]["speed"] = true;
     filter["weather"][0]["icon"] = true;
     filter["weather"][0]["description"] = true;
     filter["sys"]["sunrise"] = true;
@@ -196,6 +197,7 @@ Weather WeatherParser::parseCurrentWeather(const std::string& json) const
     weather.tempMax = main["temp_max"] | weather.temperature;
     weather.humidity = static_cast<uint8_t>(main["humidity"] | 0);
     weather.pressure = static_cast<uint16_t>(main["pressure"] | 0);
+    weather.windSpeed = doc["wind"]["speed"] | 0.0f;
     weather.sunrise = doc["sys"]["sunrise"] | 0U;
     weather.sunset = doc["sys"]["sunset"] | 0U;
 

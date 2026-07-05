@@ -19,6 +19,7 @@ public:
     // Interwały odświeżania poszczególnych widgetów (konfigurowalne).
     uint16_t getClockRefreshMinutes() const noexcept;
     uint16_t getWeatherRefreshMinutes() const noexcept;
+    uint16_t getCurrencyRefreshMinutes() const noexcept;
 
     const std::string& getWifiSSID() const noexcept;
     const std::string& getWifiPassword() const noexcept;
@@ -33,6 +34,7 @@ private:
     unsigned long refreshIntervalMs_ = 30000UL;
     uint16_t clockRefreshMinutes_ = 1;     // zegar odświeża się co 1 minutę
     uint16_t weatherRefreshMinutes_ = 60;  // pogoda i prognoza co 1 godzinę
+    uint16_t currencyRefreshMinutes_ = 360; // waluty co 6 godzin
     std::string wifiSSID_;
     std::string wifiPassword_;
     std::string openWeatherApiKey_;
